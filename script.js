@@ -18,7 +18,7 @@ const gridFreqSpan = document.getElementById("grid-freq");
 function toggleMaster() {
   running = !running;
   if (running) {
-    speed = 40;
+    speed = 50; // Start at 50 Hz
     voltage = 0;
     excitation = false;
     genBreakerClosed = false;
@@ -39,11 +39,16 @@ function toggleField() {
 }
 
 function adjustVoltage(delta) {
-  if (excitation) voltage = Math.min(115, Math.max(0, voltage + delta));
+  if (excitation) {
+    voltage = Math.min(115, Math.max(0, voltage + delta));
+  }
 }
 
 function adjustSpeed(delta) {
-  if (running) speed = Math.min(65, Math.max(55, speed + delta));
+  if (running) {
+    speed = parseFloat((speed + delta).toFixed(1)); // Fix for first-jump bug
+    speed = Math.min(65, Math.max(55, speed));
+  }
 }
 
 function attemptCloseBreaker() {
@@ -78,7 +83,7 @@ function holdButton(id, callback) {
 }
 
 function getPhaseDiffDeg() {
-  const delta = gridPhase - genPhase;
+  const delta = genPhase - gridPhase;
   return ((delta + Math.PI) % (2 * Math.PI)) - Math.PI;
 }
 
@@ -93,9 +98,8 @@ function drawSynchroscope() {
   syncCtx.stroke();
 
   let angle = 0;
-
   if (running && excitation) {
-    angle = getPhaseDiffDeg();
+    angle = getPhaseDiffDeg(); // Radians, -π to π
   }
 
   const x = 100 + 70 * Math.sin(angle);
@@ -116,6 +120,7 @@ function drawSineWaves(time) {
   sineCtx.clearRect(0, 0, sineCanvas.width, sineCanvas.height);
   sineCtx.lineWidth = 2;
 
+  // Grid
   sineCtx.beginPath();
   sineCtx.strokeStyle = "green";
   for (let x = 0; x < 800; x++) {
@@ -125,6 +130,7 @@ function drawSineWaves(time) {
   }
   sineCtx.stroke();
 
+  // Generator
   sineCtx.beginPath();
   sineCtx.strokeStyle = "blue";
   for (let x = 0; x < 800; x++) {
@@ -144,7 +150,7 @@ function updateSyncLights() {
   const light1 = document.getElementById("sync-light-1");
   const light2 = document.getElementById("sync-light-2");
 
-  if (!running || !excitation || genBreakerClosed) {
+  if (!running || !excitation) {
     light1.style.background = "#222";
     light2.style.background = "#222";
     return;
@@ -153,8 +159,8 @@ function updateSyncLights() {
   const v1 = 120;
   const v2 = 120 * (voltage / gridVoltage);
   const theta = getPhaseDiffDeg();
+  const radians = theta;
 
-  const radians = theta * (Math.PI / 180);
   const diff = Math.sqrt(
     v1 ** 2 + v2 ** 2 - 2 * v1 * v2 * Math.cos(radians)
   );
