@@ -14,16 +14,24 @@ const gridFreqSpan = document.getElementById("grid-freq");
 
 function toggleMaster() {
   running = !running;
-  if (!running) {
+  if (running) {
+    speed = 40;         // Start under frequency
+    voltage = 0;        // Still zero until excitation
     excitation = false;
-    voltage = 0;
+    genBreakerClosed = false;
+  } else {
     speed = 0;
+    voltage = 0;
+    excitation = false;
     genBreakerClosed = false;
   }
 }
 
 function toggleField() {
-  if (running) excitation = !excitation;
+  if (running && !excitation) {
+    excitation = true;
+    voltage = 80; // Undervoltage at start
+  }
 }
 
 function adjustVoltage(delta) {
@@ -58,8 +66,7 @@ function drawSynchroscope() {
   syncCtx.stroke();
 
   let deltaFreq = 0;
-
-  if (running && !genBreakerClosed) {
+  if (running && excitation && !genBreakerClosed) {
     deltaFreq = speed - gridFreq;
   }
 
@@ -83,7 +90,7 @@ function drawSineWaves(time) {
   sineCtx.clearRect(0, 0, sineCanvas.width, sineCanvas.height);
   sineCtx.lineWidth = 2;
 
-  // Grid wave
+  // Grid wave (always present)
   sineCtx.beginPath();
   sineCtx.strokeStyle = "green";
   for (let x = 0; x < 800; x++) {
@@ -99,18 +106,26 @@ function drawSineWaves(time) {
 
   for (let x = 0; x < 800; x++) {
     let y = 100;
-
     if (running && excitation) {
       const t = (x / 800) * 2 * Math.PI * 4;
       const freq = genBreakerClosed ? gridFreq : speed;
       const amplitude = (voltage / gridVoltage) * 80;
       y = 100 - Math.sin(t + time * 2 * Math.PI * freq / 1000) * amplitude;
     }
-
     sineCtx.lineTo(x, y);
   }
-
   sineCtx.stroke();
+}
+
+// Sync light intensity calculation
+function getLightBrightness() {
+  if (!running || !excitation || genBreakerClosed) return 0;
+
+  const freqDelta = Math.abs(speed - gridFreq); // Hz
+  const voltDelta = Math.abs(voltage - gridVoltage); // kV
+  const phaseFactor = Math.min(freqDelta * 5, 1); // scale for visual
+  const voltFactor = Math.min(voltDelta / 20, 1); // normalize voltage mismatch
+  return Math.min(1, (phaseFactor + voltFactor) / 2); // average mismatch
 }
 
 // Update loop
@@ -123,14 +138,11 @@ function update() {
   gridVoltSpan.textContent = `${gridVoltage} kV`;
   gridFreqSpan.textContent = `${gridFreq.toFixed(1)} Hz`;
 
-  const inSync =
-    running &&
-    excitation &&
-    Math.abs(speed - gridFreq) < 0.2 &&
-    Math.abs(voltage - gridVoltage) < 5;
-
-  document.getElementById("sync-light-1").style.background = inSync ? "#0f0" : "#400";
-  document.getElementById("sync-light-2").style.background = inSync ? "#0f0" : "#400";
+  // Light brightness based on mismatch
+  const brightness = getLightBrightness();
+  const color = `rgb(${Math.floor(255 * brightness)}, 0, 0)`;
+  document.getElementById("sync-light-1").style.background = color;
+  document.getElementById("sync-light-2").style.background = color;
 
   drawSynchroscope();
   drawSineWaves(Date.now());
