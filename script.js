@@ -35,8 +35,14 @@ function adjustSpeed(delta) {
 }
 
 function attemptCloseBreaker() {
-  if (Math.abs(speed - gridFreq) < 0.5 && Math.abs(voltage - gridVoltage) < 5) {
+  const phaseMatch = Math.abs(speed - gridFreq) < 0.2;
+  const voltMatch = Math.abs(voltage - gridVoltage) < 5;
+
+  if (running && excitation && phaseMatch && voltMatch) {
     genBreakerClosed = true;
+    console.log("GEN BREAKER CLOSED");
+  } else {
+    console.log("SYNC CONDITIONS NOT MET");
   }
 }
 
@@ -51,9 +57,13 @@ function drawSynchroscope() {
   syncCtx.strokeStyle = "#888";
   syncCtx.stroke();
 
-  const deltaFreq = speed - gridFreq;
-  const angle = ((Date.now() / 1000) * deltaFreq * Math.PI) % (2 * Math.PI);
+  let deltaFreq = 0;
 
+  if (running && !genBreakerClosed) {
+    deltaFreq = speed - gridFreq;
+  }
+
+  const angle = ((Date.now() / 1000) * deltaFreq * Math.PI) % (2 * Math.PI);
   const x = 100 + 70 * Math.cos(angle);
   const y = 100 + 70 * Math.sin(angle);
 
@@ -71,10 +81,9 @@ const sineCtx = sineCanvas.getContext("2d");
 
 function drawSineWaves(time) {
   sineCtx.clearRect(0, 0, sineCanvas.width, sineCanvas.height);
-
   sineCtx.lineWidth = 2;
 
-  // Grid
+  // Grid wave
   sineCtx.beginPath();
   sineCtx.strokeStyle = "green";
   for (let x = 0; x < 800; x++) {
@@ -84,28 +93,44 @@ function drawSineWaves(time) {
   }
   sineCtx.stroke();
 
-  // Generator
+  // Generator wave
   sineCtx.beginPath();
   sineCtx.strokeStyle = "blue";
+
   for (let x = 0; x < 800; x++) {
-    const t = (x / 800) * 2 * Math.PI * 4;
-    const y = 100 - Math.sin(t + time * 2 * Math.PI * speed / 1000) * 80;
+    let y = 100;
+
+    if (running && excitation) {
+      const t = (x / 800) * 2 * Math.PI * 4;
+      const freq = genBreakerClosed ? gridFreq : speed;
+      const amplitude = (voltage / gridVoltage) * 80;
+      y = 100 - Math.sin(t + time * 2 * Math.PI * freq / 1000) * amplitude;
+    }
+
     sineCtx.lineTo(x, y);
   }
+
   sineCtx.stroke();
 }
 
 // Update loop
 function update() {
-  genVoltSpan.textContent = `${voltage.toFixed(1)} kV`;
-  genFreqSpan.textContent = `${speed.toFixed(1)} Hz`;
+  const genFreq = running ? (genBreakerClosed ? gridFreq : speed) : 0;
+  const genVolt = running && excitation ? voltage : 0;
+
+  genVoltSpan.textContent = `${genVolt.toFixed(1)} kV`;
+  genFreqSpan.textContent = `${genFreq.toFixed(1)} Hz`;
   gridVoltSpan.textContent = `${gridVoltage} kV`;
   gridFreqSpan.textContent = `${gridFreq.toFixed(1)} Hz`;
 
-  document.getElementById("sync-light-1").style.background =
-    Math.abs(speed - gridFreq) < 0.2 ? "#0f0" : "#400";
-  document.getElementById("sync-light-2").style.background =
-    Math.abs(speed - gridFreq) < 0.2 ? "#0f0" : "#400";
+  const inSync =
+    running &&
+    excitation &&
+    Math.abs(speed - gridFreq) < 0.2 &&
+    Math.abs(voltage - gridVoltage) < 5;
+
+  document.getElementById("sync-light-1").style.background = inSync ? "#0f0" : "#400";
+  document.getElementById("sync-light-2").style.background = inSync ? "#0f0" : "#400";
 
   drawSynchroscope();
   drawSineWaves(Date.now());
