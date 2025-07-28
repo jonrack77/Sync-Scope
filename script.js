@@ -59,7 +59,6 @@ function attemptCloseBreaker() {
   }
 }
 
-// Click-and-hold handler
 function holdButton(id, callback) {
   const el = document.getElementById(id);
   let interval;
@@ -78,13 +77,11 @@ function holdButton(id, callback) {
   el.addEventListener("touchend", () => clearInterval(interval));
 }
 
-// Phase difference in degrees
 function getPhaseDiffDeg() {
   const delta = gridPhase - genPhase;
-  return ((delta + Math.PI) % (2 * Math.PI)) - Math.PI; // wrap to -π to π
+  return ((delta + Math.PI) % (2 * Math.PI)) - Math.PI;
 }
 
-// Synchroscope gauge using phase difference
 const syncCanvas = document.getElementById("synchroscope");
 const syncCtx = syncCanvas.getContext("2d");
 
@@ -98,7 +95,7 @@ function drawSynchroscope() {
   let angle = 0;
 
   if (running && excitation) {
-    angle = getPhaseDiffDeg(); // angle in radians
+    angle = getPhaseDiffDeg();
   }
 
   const x = 100 + 70 * Math.sin(angle);
@@ -112,7 +109,6 @@ function drawSynchroscope() {
   syncCtx.stroke();
 }
 
-// Sine wave animation
 const sineCanvas = document.getElementById("sineCanvas");
 const sineCtx = sineCanvas.getContext("2d");
 
@@ -120,7 +116,6 @@ function drawSineWaves(time) {
   sineCtx.clearRect(0, 0, sineCanvas.width, sineCanvas.height);
   sineCtx.lineWidth = 2;
 
-  // Grid wave
   sineCtx.beginPath();
   sineCtx.strokeStyle = "green";
   for (let x = 0; x < 800; x++) {
@@ -130,7 +125,6 @@ function drawSineWaves(time) {
   }
   sineCtx.stroke();
 
-  // Generator wave
   sineCtx.beginPath();
   sineCtx.strokeStyle = "blue";
   for (let x = 0; x < 800; x++) {
@@ -146,7 +140,6 @@ function drawSineWaves(time) {
   sineCtx.stroke();
 }
 
-// Sync light brightness calculation using PT-like behavior
 function updateSyncLights() {
   const light1 = document.getElementById("sync-light-1");
   const light2 = document.getElementById("sync-light-2");
@@ -166,8 +159,7 @@ function updateSyncLights() {
     v1 ** 2 + v2 ** 2 - 2 * v1 * v2 * Math.cos(radians)
   );
 
-  // Convert to brightness (normalized)
-  const brightness = Math.min(diff / 170, 1); // 170 ≈ max vector difference
+  const brightness = Math.min(diff / 170, 1);
   const level = Math.floor(255 * brightness);
   const color = `rgb(${level},0,0)`;
 
@@ -175,7 +167,6 @@ function updateSyncLights() {
   light2.style.background = color;
 }
 
-// Update loop
 function update(dt) {
   if (running) {
     gridPhase += (2 * Math.PI * gridFreq * dt) / 1000;
@@ -198,7 +189,6 @@ function update(dt) {
   drawSineWaves(Date.now());
 }
 
-// Timing loop
 let last = performance.now();
 function loop(now) {
   const dt = now - last;
@@ -208,7 +198,6 @@ function loop(now) {
 }
 requestAnimationFrame(loop);
 
-// Wire hold buttons
 holdButton("spd-up", () => adjustSpeed(0.1));
 holdButton("spd-dn", () => adjustSpeed(-0.1));
 holdButton("vr-up", () => adjustVoltage(1));
