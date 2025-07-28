@@ -1,10 +1,38 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Sync Scope</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Generator Sync Simulator</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h1>Hello from Sync Scope</h1>
+  <div class="hmi">
+    <div class="gauges">
+      <canvas id="synchroscope" width="200" height="200"></canvas>
+      <div class="lights">
+        <div id="sync-light-1" class="light"></div>
+        <div id="sync-light-2" class="light"></div>
+      </div>
+      <div class="voltage-info">
+        <p>Grid: <span id="grid-voltage">115 kV</span> | <span id="grid-freq">60.0 Hz</span></p>
+        <p>Gen: <span id="gen-voltage">0.0 kV</span> | <span id="gen-freq">0.0 Hz</span></p>
+      </div>
+    </div>
+
+    <div class="switches">
+      <button onclick="toggleMaster()">MSTR-START/STOP</button>
+      <button onclick="toggleField()">FLD-CLOSE</button>
+      <button onclick="adjustVoltage(1)">VR-ADJ-UP</button>
+      <button onclick="adjustVoltage(-1)">VR-ADJ-DN</button>
+      <button onclick="adjustSpeed(0.1)">SPD-ADJ-UP</button>
+      <button onclick="adjustSpeed(-0.1)">SPD-ADJ-DN</button>
+      <button onclick="attemptCloseBreaker()">GEN-BKR</button>
+    </div>
+
+    <canvas id="sineCanvas" width="800" height="200"></canvas>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
-
