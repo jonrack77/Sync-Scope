@@ -4,6 +4,9 @@ let voltage = 0;
 let speed = 0;
 let genBreakerClosed = false;
 
+let genPhase = 0;
+let gridPhase = 0;
+
 const gridFreq = 60;
 const gridVoltage = 115;
 
@@ -15,10 +18,11 @@ const gridFreqSpan = document.getElementById("grid-freq");
 function toggleMaster() {
   running = !running;
   if (running) {
-    speed = 40;         // Start under frequency
-    voltage = 0;        // Still zero until excitation
+    speed = 40;
+    voltage = 0;
     excitation = false;
     genBreakerClosed = false;
+    genPhase = 0;
   } else {
     speed = 0;
     voltage = 0;
@@ -30,7 +34,7 @@ function toggleMaster() {
 function toggleField() {
   if (running && !excitation) {
     excitation = true;
-    voltage = 80; // Undervoltage at start
+    voltage = 80;
   }
 }
 
@@ -43,18 +47,44 @@ function adjustSpeed(delta) {
 }
 
 function attemptCloseBreaker() {
-  const phaseMatch = Math.abs(speed - gridFreq) < 0.2;
+  const phaseMatch = Math.abs(getPhaseDiffDeg()) < 15;
   const voltMatch = Math.abs(voltage - gridVoltage) < 5;
 
   if (running && excitation && phaseMatch && voltMatch) {
     genBreakerClosed = true;
+    genPhase = gridPhase;
     console.log("GEN BREAKER CLOSED");
   } else {
     console.log("SYNC CONDITIONS NOT MET");
   }
 }
 
-// Synchroscope gauge
+// Click-and-hold handler
+function holdButton(id, callback) {
+  const el = document.getElementById(id);
+  let interval;
+
+  el.addEventListener("mousedown", () => {
+    callback();
+    interval = setInterval(callback, 100);
+  });
+
+  el.addEventListener("mouseup", () => clearInterval(interval));
+  el.addEventListener("mouseleave", () => clearInterval(interval));
+  el.addEventListener("touchstart", () => {
+    callback();
+    interval = setInterval(callback, 100);
+  });
+  el.addEventListener("touchend", () => clearInterval(interval));
+}
+
+// Phase difference in degrees
+function getPhaseDiffDeg() {
+  const delta = gridPhase - genPhase;
+  return ((delta + Math.PI) % (2 * Math.PI)) - Math.PI; // wrap to -π to π
+}
+
+// Synchroscope gauge using phase difference
 const syncCanvas = document.getElementById("synchroscope");
 const syncCtx = syncCanvas.getContext("2d");
 
@@ -65,14 +95,14 @@ function drawSynchroscope() {
   syncCtx.strokeStyle = "#888";
   syncCtx.stroke();
 
-  let deltaFreq = 0;
-  if (running && excitation && !genBreakerClosed) {
-    deltaFreq = speed - gridFreq;
+  let angle = 0;
+
+  if (running && excitation) {
+    angle = getPhaseDiffDeg(); // angle in radians
   }
 
-  const angle = ((Date.now() / 1000) * deltaFreq * Math.PI) % (2 * Math.PI);
-  const x = 100 + 70 * Math.cos(angle);
-  const y = 100 + 70 * Math.sin(angle);
+  const x = 100 + 70 * Math.sin(angle);
+  const y = 100 - 70 * Math.cos(angle);
 
   syncCtx.beginPath();
   syncCtx.moveTo(100, 100);
@@ -90,12 +120,12 @@ function drawSineWaves(time) {
   sineCtx.clearRect(0, 0, sineCanvas.width, sineCanvas.height);
   sineCtx.lineWidth = 2;
 
-  // Grid wave (always present)
+  // Grid wave
   sineCtx.beginPath();
   sineCtx.strokeStyle = "green";
   for (let x = 0; x < 800; x++) {
-    const t = (x / 800) * 2 * Math.PI * 4;
-    const y = 100 - Math.sin(t + time * 2 * Math.PI * gridFreq / 1000) * 80;
+    const t = x / 800;
+    const y = 100 - Math.sin(2 * Math.PI * 4 * t + gridPhase) * 80;
     sineCtx.lineTo(x, y);
   }
   sineCtx.stroke();
@@ -103,33 +133,58 @@ function drawSineWaves(time) {
   // Generator wave
   sineCtx.beginPath();
   sineCtx.strokeStyle = "blue";
-
   for (let x = 0; x < 800; x++) {
+    const t = x / 800;
     let y = 100;
     if (running && excitation) {
-      const t = (x / 800) * 2 * Math.PI * 4;
+      const amp = (voltage / gridVoltage) * 80;
       const freq = genBreakerClosed ? gridFreq : speed;
-      const amplitude = (voltage / gridVoltage) * 80;
-      y = 100 - Math.sin(t + time * 2 * Math.PI * freq / 1000) * amplitude;
+      y = 100 - Math.sin(2 * Math.PI * 4 * t + genPhase) * amp;
     }
     sineCtx.lineTo(x, y);
   }
   sineCtx.stroke();
 }
 
-// Sync light intensity calculation
-function getLightBrightness() {
-  if (!running || !excitation || genBreakerClosed) return 0;
+// Sync light brightness calculation using PT-like behavior
+function updateSyncLights() {
+  const light1 = document.getElementById("sync-light-1");
+  const light2 = document.getElementById("sync-light-2");
 
-  const freqDelta = Math.abs(speed - gridFreq); // Hz
-  const voltDelta = Math.abs(voltage - gridVoltage); // kV
-  const phaseFactor = Math.min(freqDelta * 5, 1); // scale for visual
-  const voltFactor = Math.min(voltDelta / 20, 1); // normalize voltage mismatch
-  return Math.min(1, (phaseFactor + voltFactor) / 2); // average mismatch
+  if (!running || !excitation || genBreakerClosed) {
+    light1.style.background = "#222";
+    light2.style.background = "#222";
+    return;
+  }
+
+  const v1 = 120;
+  const v2 = 120 * (voltage / gridVoltage);
+  const theta = getPhaseDiffDeg();
+
+  const radians = theta * (Math.PI / 180);
+  const diff = Math.sqrt(
+    v1 ** 2 + v2 ** 2 - 2 * v1 * v2 * Math.cos(radians)
+  );
+
+  // Convert to brightness (normalized)
+  const brightness = Math.min(diff / 170, 1); // 170 ≈ max vector difference
+  const level = Math.floor(255 * brightness);
+  const color = `rgb(${level},0,0)`;
+
+  light1.style.background = color;
+  light2.style.background = color;
 }
 
 // Update loop
-function update() {
+function update(dt) {
+  if (running) {
+    gridPhase += (2 * Math.PI * gridFreq * dt) / 1000;
+    genPhase += (2 * Math.PI * (genBreakerClosed ? gridFreq : speed) * dt) / 1000;
+  }
+
+  gridPhase %= 2 * Math.PI;
+  genPhase %= 2 * Math.PI;
+
   const genFreq = running ? (genBreakerClosed ? gridFreq : speed) : 0;
   const genVolt = running && excitation ? voltage : 0;
 
@@ -138,16 +193,23 @@ function update() {
   gridVoltSpan.textContent = `${gridVoltage} kV`;
   gridFreqSpan.textContent = `${gridFreq.toFixed(1)} Hz`;
 
-  // Light brightness based on mismatch
-  const brightness = getLightBrightness();
-  const color = `rgb(${Math.floor(255 * brightness)}, 0, 0)`;
-  document.getElementById("sync-light-1").style.background = color;
-  document.getElementById("sync-light-2").style.background = color;
-
+  updateSyncLights();
   drawSynchroscope();
   drawSineWaves(Date.now());
-
-  requestAnimationFrame(update);
 }
 
-update();
+// Timing loop
+let last = performance.now();
+function loop(now) {
+  const dt = now - last;
+  last = now;
+  update(dt);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// Wire hold buttons
+holdButton("spd-up", () => adjustSpeed(0.1));
+holdButton("spd-dn", () => adjustSpeed(-0.1));
+holdButton("vr-up", () => adjustVoltage(1));
+holdButton("vr-dn", () => adjustVoltage(-1));
