@@ -18,7 +18,7 @@ const gridFreqSpan = document.getElementById("grid-freq");
 function toggleMaster() {
   running = !running;
   if (running) {
-    speed = 50; // Start at 50 Hz
+    speed = 50;
     voltage = 0;
     excitation = false;
     genBreakerClosed = false;
@@ -46,7 +46,7 @@ function adjustVoltage(delta) {
 
 function adjustSpeed(delta) {
   if (running) {
-    speed = parseFloat((speed + delta).toFixed(1)); // Fix for first-jump bug
+    speed = parseFloat((speed + delta).toFixed(1));
     speed = Math.min(65, Math.max(55, speed));
   }
 }
@@ -87,29 +87,60 @@ function getPhaseDiffDeg() {
   return ((delta + Math.PI) % (2 * Math.PI)) - Math.PI;
 }
 
+// Synchroscope rendering
 const syncCanvas = document.getElementById("synchroscope");
 const syncCtx = syncCanvas.getContext("2d");
 
 function drawSynchroscope() {
   syncCtx.clearRect(0, 0, 200, 200);
+  const cx = 100, cy = 100, r = 90;
+
+  // Outer ring
   syncCtx.beginPath();
-  syncCtx.arc(100, 100, 90, 0, 2 * Math.PI);
-  syncCtx.strokeStyle = "#888";
+  syncCtx.arc(cx, cy, r, 0, 2 * Math.PI);
+  syncCtx.strokeStyle = "#ccc";
+  syncCtx.lineWidth = 3;
   syncCtx.stroke();
 
-  let angle = 0;
+  // Text labels
+  syncCtx.fillStyle = "#fff";
+  syncCtx.font = "12px monospace";
+  syncCtx.fillText("SLOW", 20, cy);
+  syncCtx.fillText("FAST", 150, cy);
+
+  // Curved arrow (clockwise)
+  syncCtx.beginPath();
+  syncCtx.arc(cx, cy, 70, -Math.PI / 3, Math.PI / 3);
+  syncCtx.strokeStyle = "#aaa";
+  syncCtx.lineWidth = 2;
+  syncCtx.stroke();
+
+  // Arrow head
+  const angle = Math.PI / 3;
+  const x1 = cx + 70 * Math.cos(angle);
+  const y1 = cy + 70 * Math.sin(angle);
+  syncCtx.beginPath();
+  syncCtx.moveTo(x1, y1);
+  syncCtx.lineTo(x1 - 8, y1 - 5);
+  syncCtx.lineTo(x1 - 8, y1 + 5);
+  syncCtx.closePath();
+  syncCtx.fillStyle = "#aaa";
+  syncCtx.fill();
+
+  // Phase needle
+  let needleAngle = 0;
   if (running && excitation) {
-    angle = getPhaseDiffDeg(); // Radians, -π to π
+    needleAngle = getPhaseDiffDeg(); // -π to π
   }
 
-  const x = 100 + 70 * Math.sin(angle);
-  const y = 100 - 70 * Math.cos(angle);
+  const nx = cx + 70 * Math.sin(needleAngle);
+  const ny = cy - 70 * Math.cos(needleAngle);
 
   syncCtx.beginPath();
-  syncCtx.moveTo(100, 100);
-  syncCtx.lineTo(x, y);
+  syncCtx.moveTo(cx, cy);
+  syncCtx.lineTo(nx, ny);
   syncCtx.strokeStyle = "#0f0";
-  syncCtx.lineWidth = 3;
+  syncCtx.lineWidth = 4;
   syncCtx.stroke();
 }
 
@@ -120,7 +151,6 @@ function drawSineWaves(time) {
   sineCtx.clearRect(0, 0, sineCanvas.width, sineCanvas.height);
   sineCtx.lineWidth = 2;
 
-  // Grid
   sineCtx.beginPath();
   sineCtx.strokeStyle = "green";
   for (let x = 0; x < 800; x++) {
@@ -130,7 +160,6 @@ function drawSineWaves(time) {
   }
   sineCtx.stroke();
 
-  // Generator
   sineCtx.beginPath();
   sineCtx.strokeStyle = "blue";
   for (let x = 0; x < 800; x++) {
