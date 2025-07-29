@@ -2,45 +2,42 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sync Scope Simulator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Generator Sync Simulator</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="gauges">
-    <div>
-      <label>GEN VOLTS</label>
-      <div class="gauge-display" id="gen-volts">0.0 kV</div>
-    </div>
-    <div>
-      <label>BUS VOLTS</label>
-      <div class="gauge-display" id="bus-volts">115 kV</div>
-    </div>
-  </div>
-
-  <canvas id="synchroscope" width="200" height="200"></canvas>
-
-  <div class="sync-lights">
-    <div class="sync-light" id="light-left"></div>
-    <div class="sync-light" id="light-right"></div>
-  </div>
-
-  <div class="frequencies">
-    <span id="gen-freq">Gen Freq: 0.0 Hz</span>
-    <span id="grid-freq">Grid Freq: 60.0 Hz</span>
-  </div>
+  <h1>Generator Sync Simulator</h1>
 
   <div class="controls">
-    <button onclick="toggleMaster()">MSTR-START/STOP</button>
-    <button onclick="closeField()">FLD-CLOSE</button>
-    <button onmousedown="vrAdjust(true)" onmouseup="stopVrAdjust()">VR-ADJ-UP</button>
-    <button onmousedown="vrAdjust(false)" onmouseup="stopVrAdjust()">VR-ADJ-DN</button>
-    <button onmousedown="spdAdjust(true)" onmouseup="stopSpdAdjust()">SPD-ADJ-UP</button>
-    <button onmousedown="spdAdjust(false)" onmouseup="stopSpdAdjust()">SPD-ADJ-DN</button>
-    <button onclick="toggleBreaker()">GEN-BKR</button>
+    <button id="syncscopeBtn">Syncscope</button>
+    <button id="masterStartBtn">Master Start</button>
+    <button id="masterStopBtn">Master Stop</button>
+    <button id="fieldBreakerBtn">Field Breaker</button>
+    <div class="adjust">
+      <span>Voltage:</span>
+      <button id="voltUpBtn">▲</button>
+      <button id="voltDownBtn">▼</button>
+    </div>
+    <div class="adjust">
+      <span>Speed:</span>
+      <button id="speedUpBtn">▲</button>
+      <button id="speedDownBtn">▼</button>
+    </div>
   </div>
 
-  <canvas id="waveform" width="800" height="200"></canvas>
+  <div class="gauges">
+    <div class="gauge"><canvas id="genVoltGauge" width="200" height="100"></canvas><p>Gen Volts</p></div>
+    <div class="gauge"><canvas id="busVoltGauge" width="200" height="100"></canvas><p>Bus Volts</p></div>
+    <div class="gauge"><canvas id="syncscope" width="200" height="200"></canvas></div>
+  </div>
+
+  <div class="sync-lights">
+    <div id="lightA" class="light"></div>
+    <div id="lightB" class="light"></div>
+  </div>
+
+  <canvas id="sineCanvas" width="800" height="200"></canvas>
 
   <script src="script.js"></script>
 </body>
