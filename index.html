@@ -2,49 +2,45 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Generator Sync Simulator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sync Scope Simulator</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="hmi">
-    <div class="meter-row">
-      <div class="meter">
-        <label>GEN VOLTS</label>
-        <div class="meter-display" id="gen-voltage">0.0 kV</div>
-      </div>
-      <div class="meter">
-        <label>BUS VOLTS</label>
-        <div class="meter-display" id="grid-voltage">115 kV</div>
-      </div>
+  <div class="gauges">
+    <div>
+      <label>GEN VOLTS</label>
+      <div class="gauge-display" id="gen-volts">0.0 kV</div>
     </div>
-
-    <div class="synchro-section">
-      <canvas id="synchroscope" width="200" height="200"></canvas>
+    <div>
+      <label>BUS VOLTS</label>
+      <div class="gauge-display" id="bus-volts">115 kV</div>
     </div>
-
-    <div class="light-row">
-      <div id="sync-light-1" class="light"></div>
-      <div id="sync-light-2" class="light"></div>
-    </div>
-
-    <div class="freq-row">
-      <div>Gen Freq: <span id="gen-freq">0.0</span> Hz</div>
-      <div>Grid Freq: <span id="grid-freq">60.0</span> Hz</div>
-    </div>
-
-    <div class="switches">
-      <button onclick="toggleMaster()">MSTR-START/STOP</button>
-      <button onclick="toggleField()">FLD-CLOSE</button>
-      <button id="vr-up">VR-ADJ-UP</button>
-      <button id="vr-dn">VR-ADJ-DN</button>
-      <button id="spd-up">SPD-ADJ-UP</button>
-      <button id="spd-dn">SPD-ADJ-DN</button>
-      <button onclick="attemptCloseBreaker()">GEN-BKR</button>
-    </div>
-
-    <canvas id="sineCanvas" width="800" height="200"></canvas>
   </div>
+
+  <canvas id="synchroscope" width="200" height="200"></canvas>
+
+  <div class="sync-lights">
+    <div class="sync-light" id="light-left"></div>
+    <div class="sync-light" id="light-right"></div>
+  </div>
+
+  <div class="frequencies">
+    <span id="gen-freq">Gen Freq: 0.0 Hz</span>
+    <span id="grid-freq">Grid Freq: 60.0 Hz</span>
+  </div>
+
+  <div class="controls">
+    <button onclick="toggleMaster()">MSTR-START/STOP</button>
+    <button onclick="closeField()">FLD-CLOSE</button>
+    <button onmousedown="vrAdjust(true)" onmouseup="stopVrAdjust()">VR-ADJ-UP</button>
+    <button onmousedown="vrAdjust(false)" onmouseup="stopVrAdjust()">VR-ADJ-DN</button>
+    <button onmousedown="spdAdjust(true)" onmouseup="stopSpdAdjust()">SPD-ADJ-UP</button>
+    <button onmousedown="spdAdjust(false)" onmouseup="stopSpdAdjust()">SPD-ADJ-DN</button>
+    <button onclick="toggleBreaker()">GEN-BKR</button>
+  </div>
+
+  <canvas id="waveform" width="800" height="200"></canvas>
 
   <script src="script.js"></script>
 </body>
