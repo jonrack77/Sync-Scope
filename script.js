@@ -1,181 +1,190 @@
-let masterStarted = false;
+const sineCanvas = document.getElementById("sineCanvas");
+const ctx = sineCanvas.getContext("2d");
+
+let syncscopeActive = false;
+let masterOn = false;
 let fieldClosed = false;
-let genVoltage = 0;
-let genFrequency = 0;
-let genPhase = 0;
-let vrInterval = null;
-let spdInterval = null;
-let breakerClosed = false;
 
-const gridVoltage = 115;
-const gridFrequency = 60;
-let gridPhase = 0;
+let busFreq = 60;
+let busVolts = 115;
 
-function toggleMaster() {
-  masterStarted = !masterStarted;
-  if (masterStarted) {
-    genFrequency = 50;
-  } else {
-    genVoltage = 0;
-    genFrequency = 0;
-    fieldClosed = false;
-    breakerClosed = false;
-  }
-}
+let genFreq = 55;
+let genVolts = 0;
 
-function closeField() {
-  if (!masterStarted) return;
+let internalGenVolts = 0;
+let internalGenFreq = 55;
+
+let phase = 0;
+let time = 0;
+
+const maxVolts = 130;
+const minVolts = 0;
+
+let holdSpeed = 0;
+let holdVolt = 0;
+let coastTimer = null;
+
+document.getElementById("syncscopeBtn").onclick = () => {
+  syncscopeActive = true;
+};
+
+document.getElementById("masterStartBtn").onclick = () => {
+  masterOn = true;
+};
+
+document.getElementById("masterStopBtn").onclick = () => {
+  masterOn = false;
+  genFreq = 0;
+  internalGenFreq = 55;
+  internalGenVolts = 0;
+  genVolts = 0;
+};
+
+document.getElementById("fieldBreakerBtn").onclick = () => {
   fieldClosed = true;
-  genVoltage = 110;
+  genVolts = 110;
+  internalGenVolts = 110;
+  genFreq = internalGenFreq - calcExcitationDrop(internalGenVolts);
+};
+
+function calcExcitationDrop(v) {
+  return ((v - 0) / 2) * 0.1;
 }
 
-function toggleBreaker() {
-  if (!masterStarted || !fieldClosed) return;
-  breakerClosed = !breakerClosed;
-}
-
-function vrAdjust(up) {
+function updateVoltage(change) {
   if (!fieldClosed) return;
-  stopVrAdjust();
-  vrInterval = setInterval(() => {
-    genVoltage += up ? 0.5 : -0.5;
-    if (genVoltage > 130) genVoltage = 130;
-    if (genVoltage < 0) genVoltage = 0;
+  internalGenVolts = Math.min(maxVolts, Math.max(minVolts, internalGenVolts + change));
+  genVolts = internalGenVolts;
+  genFreq = internalGenFreq - calcExcitationDrop(internalGenVolts);
+}
+
+function updateSpeed(change) {
+  internalGenFreq = Math.min(66, Math.max(0, internalGenFreq + change));
+  genFreq = internalGenFreq - calcExcitationDrop(internalGenVolts);
+  if (coastTimer) clearTimeout(coastTimer);
+  coastTimer = setTimeout(() => coastSpeed(change), 100);
+}
+
+function coastSpeed(lastChange) {
+  let step = lastChange > 0 ? 0.01 : -0.01;
+  let count = 20;
+  let interval = setInterval(() => {
+    if (count-- <= 0) {
+      clearInterval(interval);
+      return;
+    }
+    internalGenFreq += step;
+    genFreq = internalGenFreq - calcExcitationDrop(internalGenVolts);
   }, 100);
 }
 
-function stopVrAdjust() {
-  clearInterval(vrInterval);
+["voltUpBtn", "voltDownBtn", "speedUpBtn", "speedDownBtn"].forEach((id) => {
+  const btn = document.getElementById(id);
+  let interval;
+  btn.addEventListener("mousedown", () => {
+    const change = id.includes("Up") ? 1 : -1;
+    if (id.includes("volt")) {
+      updateVoltage(change);
+      interval = setInterval(() => updateVoltage(change), 150);
+    } else {
+      updateSpeed(change * 0.1);
+      interval = setInterval(() => updateSpeed(change * 0.1), 150);
+    }
+  });
+  btn.addEventListener("mouseup", () => clearInterval(interval));
+  btn.addEventListener("mouseleave", () => clearInterval(interval));
+});
+
+function drawGauges() {
+  const genGauge = document.getElementById("genVoltGauge").getContext("2d");
+  const busGauge = document.getElementById("busVoltGauge").getContext("2d");
+
+  genGauge.clearRect(0, 0, 200, 100);
+  busGauge.clearRect(0, 0, 200, 100);
+
+  genGauge.fillStyle = "white";
+  genGauge.fillText(`${Math.round(genVolts)} kV`, 80, 50);
+  busGauge.fillStyle = "white";
+  busGauge.fillText(`${syncscopeActive ? busVolts : 0} kV`, 80, 50);
 }
 
-function spdAdjust(up) {
-  if (!masterStarted) return;
-  stopSpdAdjust();
-  spdInterval = setInterval(() => {
-    genFrequency += up ? 0.1 : -0.1;
-    if (genFrequency > 66) genFrequency = 66;
-    if (genFrequency < 0) genFrequency = 0;
-  }, 100);
+function drawSyncscope() {
+  const sc = document.getElementById("syncscope").getContext("2d");
+  sc.clearRect(0, 0, 200, 200);
+  sc.strokeStyle = "white";
+  sc.beginPath();
+  sc.arc(100, 100, 90, 0, Math.PI * 2);
+  sc.stroke();
+
+  if (syncscopeActive && masterOn) {
+    let delta = (genFreq - busFreq) * 6;
+    phase += delta;
+    const angle = ((phase % 360) * Math.PI) / 180;
+    const x = 100 + 80 * Math.cos(angle);
+    const y = 100 + 80 * Math.sin(angle);
+
+    sc.strokeStyle = "red";
+    sc.beginPath();
+    sc.moveTo(100, 100);
+    sc.lineTo(x, y);
+    sc.stroke();
+
+    drawSyncLights(angle);
+  } else {
+    drawSyncLights(null);
+  }
 }
 
-function stopSpdAdjust() {
-  clearInterval(spdInterval);
+function drawSyncLights(angle) {
+  const a = document.getElementById("lightA");
+  const b = document.getElementById("lightB");
+
+  if (!angle || genVolts === 0 || !syncscopeActive) {
+    a.style.background = "#111";
+    b.style.background = "#111";
+    return;
+  }
+
+  let brightness =
+    Math.abs(Math.sin(angle)) +
+    Math.abs(genVolts - busVolts) / maxVolts;
+  brightness = Math.min(1, brightness);
+
+  const glow = `0 0 ${30 * brightness}px rgba(255,255,100,${brightness})`;
+  a.style.background = `rgba(255,255,100,${brightness})`;
+  b.style.background = `rgba(255,255,100,${brightness})`;
+  a.style.boxShadow = glow;
+  b.style.boxShadow = glow;
 }
 
-function updateDisplay() {
-  document.getElementById('gen-volts').textContent = `${genVoltage.toFixed(1)} kV`;
-  document.getElementById('bus-volts').textContent = `${gridVoltage} kV`;
-  document.getElementById('gen-freq').textContent = `Gen Freq: ${genFrequency.toFixed(1)} Hz`;
-  document.getElementById('grid-freq').textContent = `Grid Freq: ${gridFrequency.toFixed(1)} Hz`;
-}
-
-function drawScope() {
-  const canvas = document.getElementById('synchroscope');
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
-  const radius = 80;
-
-  // Face
+function drawSineWave() {
+  ctx.clearRect(0, 0, sineCanvas.width, sineCanvas.height);
+  ctx.strokeStyle = "red";
   ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.strokeStyle = '#ccc';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Labels
-  ctx.font = '12px sans-serif';
-  ctx.fillStyle = '#fff';
-  ctx.fillText('SLOW', cx - radius + 10, cy);
-  ctx.fillText('FAST', cx + radius - 40, cy);
-
-  // Arrow
-  ctx.beginPath();
-  ctx.arc(cx + 30, cy + 50, 20, 0, 2 * Math.PI);
-  ctx.strokeStyle = 'gray';
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(cx + 20, cy + 50);
-  ctx.lineTo(cx + 40, cy + 50);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(cx + 35, cy + 45);
-  ctx.lineTo(cx + 40, cy + 50);
-  ctx.lineTo(cx + 35, cy + 55);
-  ctx.fill();
-
-  // Needle
-  const deltaPhase = (genPhase - gridPhase + 360) % 360;
-  const angle = ((deltaPhase / 360) * 2 * Math.PI) - Math.PI / 2;
-  const x = cx + radius * Math.cos(angle);
-  const y = cy + radius * Math.sin(angle);
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(x, y);
-  ctx.strokeStyle = 'lime';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-}
-
-function drawWaveform() {
-  const canvas = document.getElementById('waveform');
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  const width = canvas.width;
-  const height = canvas.height;
-  const mid = height / 2;
-
-  ctx.lineWidth = 2;
-
-  // Grid wave
-  ctx.beginPath();
-  ctx.strokeStyle = 'green';
-  for (let x = 0; x < width; x++) {
-    const t = x / width;
-    const y = mid + Math.sin(2 * Math.PI * t * gridFrequency + gridPhase * Math.PI / 180) * 50;
-    if (x === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+  for (let x = 0; x < sineCanvas.width; x++) {
+    let t = time + x / 100;
+    let y = 100 + 50 * Math.sin(2 * Math.PI * busFreq * t);
+    ctx.lineTo(x, y);
   }
   ctx.stroke();
 
-  // Gen wave
   if (fieldClosed) {
+    ctx.strokeStyle = "blue";
     ctx.beginPath();
-    ctx.strokeStyle = 'blue';
-    for (let x = 0; x < width; x++) {
-      const t = x / width;
-      const y = mid + Math.sin(2 * Math.PI * t * genFrequency + genPhase * Math.PI / 180) * 50 * (genVoltage / 115);
-      if (x === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+    for (let x = 0; x < sineCanvas.width; x++) {
+      let t = time + x / 100;
+      let y = 100 + 50 * Math.sin(2 * Math.PI * genFreq * t);
+      ctx.lineTo(x, y);
     }
     ctx.stroke();
   }
-
-  // Sync lights
-  const left = document.getElementById('light-left');
-  const right = document.getElementById('light-right');
-  const phaseDiff = Math.abs(gridPhase - genPhase) % 360;
-  const brightness = 1 - Math.cos(phaseDiff * Math.PI / 180);
-  const voltageDiff = Math.abs(gridVoltage - genVoltage);
-  const maxBrightness = Math.min((brightness + voltageDiff / 115), 1);
-  const intensity = Math.round(maxBrightness * 255);
-  const color = `rgb(${intensity},${intensity},${intensity})`;
-  left.style.backgroundColor = color;
-  right.style.backgroundColor = color;
+  time += 0.01;
 }
 
 function loop() {
-  if (masterStarted) {
-    genPhase = (genPhase + genFrequency * 0.6) % 360;
-  }
-  gridPhase = (gridPhase + gridFrequency * 0.6) % 360;
-  updateDisplay();
-  drawScope();
-  drawWaveform();
+  drawGauges();
+  drawSyncscope();
+  drawSineWave();
   requestAnimationFrame(loop);
 }
-
 loop();
