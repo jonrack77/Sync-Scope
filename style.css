@@ -9,21 +9,45 @@ body {
 }
 
 .hmi {
-  max-width: 1000px;
+  max-width: 900px;
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-
-.gauges {
-  display: flex;
-  align-items: center;
-  gap: 2rem;
-}
-
-.lights {
-  display: flex;
   gap: 1rem;
+}
+
+.meter-row {
+  display: flex;
+  gap: 4rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.meter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.meter-display {
+  background: #222;
+  border: 2px inset #666;
+  padding: 0.5rem 1rem;
+  margin-top: 0.3rem;
+  font-size: 1.4rem;
+  min-width: 100px;
+  text-align: center;
+}
+
+.synchro-section {
+  margin-top: 0.5rem;
+}
+
+.light-row {
+  display: flex;
+  gap: 3rem;
+  margin-top: 0.3rem;
 }
 
 .light {
@@ -32,14 +56,21 @@ body {
   background: #222;
   border-radius: 50%;
   border: 2px solid #888;
+  box-shadow: 0 0 10px #000;
+}
+
+.freq-row {
+  display: flex;
+  gap: 2rem;
+  font-size: 1rem;
 }
 
 .switches {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-top: 1rem;
   justify-content: center;
+  margin-top: 1rem;
 }
 
 button {
@@ -48,6 +79,7 @@ button {
   border: 1px solid #666;
   padding: 0.5rem 1rem;
   cursor: pointer;
+  font-size: 0.9rem;
 }
 
 button:hover {
