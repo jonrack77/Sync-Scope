@@ -1,239 +1,181 @@
-let running = false;
-let excitation = false;
-let voltage = 0;
-let speed = 0;
-let genBreakerClosed = false;
-
+let masterStarted = false;
+let fieldClosed = false;
+let genVoltage = 0;
+let genFrequency = 0;
 let genPhase = 0;
+let vrInterval = null;
+let spdInterval = null;
+let breakerClosed = false;
+
+const gridVoltage = 115;
+const gridFrequency = 60;
 let gridPhase = 0;
 
-const gridFreq = 60;
-const gridVoltage = 115;
-
-const genVoltSpan = document.getElementById("gen-voltage");
-const genFreqSpan = document.getElementById("gen-freq");
-const gridVoltSpan = document.getElementById("grid-voltage");
-const gridFreqSpan = document.getElementById("grid-freq");
-
 function toggleMaster() {
-  running = !running;
-  if (running) {
-    speed = 50;
-    voltage = 0;
-    excitation = false;
-    genBreakerClosed = false;
-    genPhase = 0;
+  masterStarted = !masterStarted;
+  if (masterStarted) {
+    genFrequency = 50;
   } else {
-    speed = 0;
-    voltage = 0;
-    excitation = false;
-    genBreakerClosed = false;
+    genVoltage = 0;
+    genFrequency = 0;
+    fieldClosed = false;
+    breakerClosed = false;
   }
 }
 
-function toggleField() {
-  if (running && !excitation) {
-    excitation = true;
-    voltage = 80;
+function closeField() {
+  if (!masterStarted) return;
+  fieldClosed = true;
+  genVoltage = 110;
+}
+
+function toggleBreaker() {
+  if (!masterStarted || !fieldClosed) return;
+  breakerClosed = !breakerClosed;
+}
+
+function vrAdjust(up) {
+  if (!fieldClosed) return;
+  stopVrAdjust();
+  vrInterval = setInterval(() => {
+    genVoltage += up ? 0.5 : -0.5;
+    if (genVoltage > 130) genVoltage = 130;
+    if (genVoltage < 0) genVoltage = 0;
+  }, 100);
+}
+
+function stopVrAdjust() {
+  clearInterval(vrInterval);
+}
+
+function spdAdjust(up) {
+  if (!masterStarted) return;
+  stopSpdAdjust();
+  spdInterval = setInterval(() => {
+    genFrequency += up ? 0.1 : -0.1;
+    if (genFrequency > 66) genFrequency = 66;
+    if (genFrequency < 0) genFrequency = 0;
+  }, 100);
+}
+
+function stopSpdAdjust() {
+  clearInterval(spdInterval);
+}
+
+function updateDisplay() {
+  document.getElementById('gen-volts').textContent = `${genVoltage.toFixed(1)} kV`;
+  document.getElementById('bus-volts').textContent = `${gridVoltage} kV`;
+  document.getElementById('gen-freq').textContent = `Gen Freq: ${genFrequency.toFixed(1)} Hz`;
+  document.getElementById('grid-freq').textContent = `Grid Freq: ${gridFrequency.toFixed(1)} Hz`;
+}
+
+function drawScope() {
+  const canvas = document.getElementById('synchroscope');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const radius = 80;
+
+  // Face
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Labels
+  ctx.font = '12px sans-serif';
+  ctx.fillStyle = '#fff';
+  ctx.fillText('SLOW', cx - radius + 10, cy);
+  ctx.fillText('FAST', cx + radius - 40, cy);
+
+  // Arrow
+  ctx.beginPath();
+  ctx.arc(cx + 30, cy + 50, 20, 0, 2 * Math.PI);
+  ctx.strokeStyle = 'gray';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx + 20, cy + 50);
+  ctx.lineTo(cx + 40, cy + 50);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx + 35, cy + 45);
+  ctx.lineTo(cx + 40, cy + 50);
+  ctx.lineTo(cx + 35, cy + 55);
+  ctx.fill();
+
+  // Needle
+  const deltaPhase = (genPhase - gridPhase + 360) % 360;
+  const angle = ((deltaPhase / 360) * 2 * Math.PI) - Math.PI / 2;
+  const x = cx + radius * Math.cos(angle);
+  const y = cy + radius * Math.sin(angle);
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(x, y);
+  ctx.strokeStyle = 'lime';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+}
+
+function drawWaveform() {
+  const canvas = document.getElementById('waveform');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const width = canvas.width;
+  const height = canvas.height;
+  const mid = height / 2;
+
+  ctx.lineWidth = 2;
+
+  // Grid wave
+  ctx.beginPath();
+  ctx.strokeStyle = 'green';
+  for (let x = 0; x < width; x++) {
+    const t = x / width;
+    const y = mid + Math.sin(2 * Math.PI * t * gridFrequency + gridPhase * Math.PI / 180) * 50;
+    if (x === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
   }
-}
+  ctx.stroke();
 
-function adjustVoltage(delta) {
-  if (excitation) {
-    voltage = Math.min(115, Math.max(0, voltage + delta));
-  }
-}
-
-function adjustSpeed(delta) {
-  if (running) {
-    speed = parseFloat((speed + delta).toFixed(1));
-    speed = Math.min(65, Math.max(55, speed));
-  }
-}
-
-function attemptCloseBreaker() {
-  const phaseMatch = Math.abs(getPhaseDiffDeg()) < 15;
-  const voltMatch = Math.abs(voltage - gridVoltage) < 5;
-
-  if (running && excitation && phaseMatch && voltMatch) {
-    genBreakerClosed = true;
-    genPhase = gridPhase;
-    console.log("GEN BREAKER CLOSED");
-  } else {
-    console.log("SYNC CONDITIONS NOT MET");
-  }
-}
-
-function holdButton(id, callback) {
-  const el = document.getElementById(id);
-  let interval;
-
-  el.addEventListener("mousedown", () => {
-    callback();
-    interval = setInterval(callback, 100);
-  });
-
-  el.addEventListener("mouseup", () => clearInterval(interval));
-  el.addEventListener("mouseleave", () => clearInterval(interval));
-  el.addEventListener("touchstart", () => {
-    callback();
-    interval = setInterval(callback, 100);
-  });
-  el.addEventListener("touchend", () => clearInterval(interval));
-}
-
-function getPhaseDiffDeg() {
-  const delta = genPhase - gridPhase;
-  return ((delta + Math.PI) % (2 * Math.PI)) - Math.PI;
-}
-
-// Synchroscope rendering
-const syncCanvas = document.getElementById("synchroscope");
-const syncCtx = syncCanvas.getContext("2d");
-
-function drawSynchroscope() {
-  syncCtx.clearRect(0, 0, 200, 200);
-  const cx = 100, cy = 100, r = 90;
-
-  // Outer ring
-  syncCtx.beginPath();
-  syncCtx.arc(cx, cy, r, 0, 2 * Math.PI);
-  syncCtx.strokeStyle = "#ccc";
-  syncCtx.lineWidth = 3;
-  syncCtx.stroke();
-
-  // Text labels
-  syncCtx.fillStyle = "#fff";
-  syncCtx.font = "12px monospace";
-  syncCtx.fillText("SLOW", 20, cy);
-  syncCtx.fillText("FAST", 150, cy);
-
-  // Curved arrow (clockwise)
-  syncCtx.beginPath();
-  syncCtx.arc(cx, cy, 70, -Math.PI / 3, Math.PI / 3);
-  syncCtx.strokeStyle = "#aaa";
-  syncCtx.lineWidth = 2;
-  syncCtx.stroke();
-
-  // Arrow head
-  const angle = Math.PI / 3;
-  const x1 = cx + 70 * Math.cos(angle);
-  const y1 = cy + 70 * Math.sin(angle);
-  syncCtx.beginPath();
-  syncCtx.moveTo(x1, y1);
-  syncCtx.lineTo(x1 - 8, y1 - 5);
-  syncCtx.lineTo(x1 - 8, y1 + 5);
-  syncCtx.closePath();
-  syncCtx.fillStyle = "#aaa";
-  syncCtx.fill();
-
-  // Phase needle
-  let needleAngle = 0;
-  if (running && excitation) {
-    needleAngle = getPhaseDiffDeg(); // -π to π
-  }
-
-  const nx = cx + 70 * Math.sin(needleAngle);
-  const ny = cy - 70 * Math.cos(needleAngle);
-
-  syncCtx.beginPath();
-  syncCtx.moveTo(cx, cy);
-  syncCtx.lineTo(nx, ny);
-  syncCtx.strokeStyle = "#0f0";
-  syncCtx.lineWidth = 4;
-  syncCtx.stroke();
-}
-
-const sineCanvas = document.getElementById("sineCanvas");
-const sineCtx = sineCanvas.getContext("2d");
-
-function drawSineWaves(time) {
-  sineCtx.clearRect(0, 0, sineCanvas.width, sineCanvas.height);
-  sineCtx.lineWidth = 2;
-
-  sineCtx.beginPath();
-  sineCtx.strokeStyle = "green";
-  for (let x = 0; x < 800; x++) {
-    const t = x / 800;
-    const y = 100 - Math.sin(2 * Math.PI * 4 * t + gridPhase) * 80;
-    sineCtx.lineTo(x, y);
-  }
-  sineCtx.stroke();
-
-  sineCtx.beginPath();
-  sineCtx.strokeStyle = "blue";
-  for (let x = 0; x < 800; x++) {
-    const t = x / 800;
-    let y = 100;
-    if (running && excitation) {
-      const amp = (voltage / gridVoltage) * 80;
-      const freq = genBreakerClosed ? gridFreq : speed;
-      y = 100 - Math.sin(2 * Math.PI * 4 * t + genPhase) * amp;
+  // Gen wave
+  if (fieldClosed) {
+    ctx.beginPath();
+    ctx.strokeStyle = 'blue';
+    for (let x = 0; x < width; x++) {
+      const t = x / width;
+      const y = mid + Math.sin(2 * Math.PI * t * genFrequency + genPhase * Math.PI / 180) * 50 * (genVoltage / 115);
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     }
-    sineCtx.lineTo(x, y);
-  }
-  sineCtx.stroke();
-}
-
-function updateSyncLights() {
-  const light1 = document.getElementById("sync-light-1");
-  const light2 = document.getElementById("sync-light-2");
-
-  if (!running || !excitation) {
-    light1.style.background = "#222";
-    light2.style.background = "#222";
-    return;
+    ctx.stroke();
   }
 
-  const v1 = 120;
-  const v2 = 120 * (voltage / gridVoltage);
-  const theta = getPhaseDiffDeg();
-  const radians = theta;
-
-  const diff = Math.sqrt(
-    v1 ** 2 + v2 ** 2 - 2 * v1 * v2 * Math.cos(radians)
-  );
-
-  const brightness = Math.min(diff / 170, 1);
-  const level = Math.floor(255 * brightness);
-  const color = `rgb(${level},0,0)`;
-
-  light1.style.background = color;
-  light2.style.background = color;
+  // Sync lights
+  const left = document.getElementById('light-left');
+  const right = document.getElementById('light-right');
+  const phaseDiff = Math.abs(gridPhase - genPhase) % 360;
+  const brightness = 1 - Math.cos(phaseDiff * Math.PI / 180);
+  const voltageDiff = Math.abs(gridVoltage - genVoltage);
+  const maxBrightness = Math.min((brightness + voltageDiff / 115), 1);
+  const intensity = Math.round(maxBrightness * 255);
+  const color = `rgb(${intensity},${intensity},${intensity})`;
+  left.style.backgroundColor = color;
+  right.style.backgroundColor = color;
 }
 
-function update(dt) {
-  if (running) {
-    gridPhase += (2 * Math.PI * gridFreq * dt) / 1000;
-    genPhase += (2 * Math.PI * (genBreakerClosed ? gridFreq : speed) * dt) / 1000;
+function loop() {
+  if (masterStarted) {
+    genPhase = (genPhase + genFrequency * 0.6) % 360;
   }
-
-  gridPhase %= 2 * Math.PI;
-  genPhase %= 2 * Math.PI;
-
-  const genFreq = running ? (genBreakerClosed ? gridFreq : speed) : 0;
-  const genVolt = running && excitation ? voltage : 0;
-
-  genVoltSpan.textContent = `${genVolt.toFixed(1)} kV`;
-  genFreqSpan.textContent = `${genFreq.toFixed(1)} Hz`;
-  gridVoltSpan.textContent = `${gridVoltage} kV`;
-  gridFreqSpan.textContent = `${gridFreq.toFixed(1)} Hz`;
-
-  updateSyncLights();
-  drawSynchroscope();
-  drawSineWaves(Date.now());
-}
-
-let last = performance.now();
-function loop(now) {
-  const dt = now - last;
-  last = now;
-  update(dt);
+  gridPhase = (gridPhase + gridFrequency * 0.6) % 360;
+  updateDisplay();
+  drawScope();
+  drawWaveform();
   requestAnimationFrame(loop);
 }
-requestAnimationFrame(loop);
 
-holdButton("spd-up", () => adjustSpeed(0.1));
-holdButton("spd-dn", () => adjustSpeed(-0.1));
-holdButton("vr-up", () => adjustVoltage(1));
-holdButton("vr-dn", () => adjustVoltage(-1));
+loop();
