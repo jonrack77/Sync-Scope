@@ -8,16 +8,29 @@
 </head>
 <body>
   <div class="hmi">
-    <div class="gauges">
+    <div class="meter-row">
+      <div class="meter">
+        <label>GEN VOLTS</label>
+        <div class="meter-display" id="gen-voltage">0.0 kV</div>
+      </div>
+      <div class="meter">
+        <label>BUS VOLTS</label>
+        <div class="meter-display" id="grid-voltage">115 kV</div>
+      </div>
+    </div>
+
+    <div class="synchro-section">
       <canvas id="synchroscope" width="200" height="200"></canvas>
-      <div class="lights">
-        <div id="sync-light-1" class="light"></div>
-        <div id="sync-light-2" class="light"></div>
-      </div>
-      <div class="voltage-info">
-        <p>Grid: <span id="grid-voltage">115 kV</span> | <span id="grid-freq">60.0 Hz</span></p>
-        <p>Gen: <span id="gen-voltage">0.0 kV</span> | <span id="gen-freq">0.0 Hz</span></p>
-      </div>
+    </div>
+
+    <div class="light-row">
+      <div id="sync-light-1" class="light"></div>
+      <div id="sync-light-2" class="light"></div>
+    </div>
+
+    <div class="freq-row">
+      <div>Gen Freq: <span id="gen-freq">0.0</span> Hz</div>
+      <div>Grid Freq: <span id="grid-freq">60.0</span> Hz</div>
     </div>
 
     <div class="switches">
