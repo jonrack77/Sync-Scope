@@ -4,6 +4,7 @@ const ctx = sineCanvas.getContext("2d");
 let syncscopeActive = false;
 let masterOn = false;
 let fieldClosed = false;
+let genBreakerClosed = false;
 
 let busFreq = 60;
 let busVolts = 115;
@@ -17,12 +18,12 @@ let internalGenFreq = 55;
 let phase = 0;
 let time = 0;
 
-const maxVolts = 130;
-const minVolts = 0;
-
-let holdSpeed = 0;
-let holdVolt = 0;
 let coastTimer = null;
+let genVoltGauge = null;
+
+window.addEventListener("load", () => {
+  genVoltGauge = document.gauges.get("genVoltCanvas");
+});
 
 document.getElementById("syncscopeBtn").onclick = () => {
   syncscopeActive = true;
@@ -47,13 +48,18 @@ document.getElementById("fieldBreakerBtn").onclick = () => {
   genFreq = internalGenFreq - calcExcitationDrop(internalGenVolts);
 };
 
+document.getElementById("genBreakerBtn").onclick = () => {
+  genBreakerClosed = !genBreakerClosed;
+  console.log("GEN-BKR:", genBreakerClosed ? "CLOSED" : "OPEN");
+};
+
 function calcExcitationDrop(v) {
-  return ((v - 0) / 2) * 0.1;
+  return (v / 2) * 0.1;
 }
 
 function updateVoltage(change) {
   if (!fieldClosed) return;
-  internalGenVolts = Math.min(maxVolts, Math.max(minVolts, internalGenVolts + change));
+  internalGenVolts = Math.min(130, Math.max(0, internalGenVolts + change));
   genVolts = internalGenVolts;
   genFreq = internalGenFreq - calcExcitationDrop(internalGenVolts);
 }
@@ -96,43 +102,45 @@ function coastSpeed(lastChange) {
 });
 
 function drawGauges() {
-  const genGauge = document.getElementById("genVoltGauge").getContext("2d");
   const busGauge = document.getElementById("busVoltGauge").getContext("2d");
-
-  genGauge.clearRect(0, 0, 200, 100);
   busGauge.clearRect(0, 0, 200, 100);
-
-  genGauge.fillStyle = "white";
-  genGauge.fillText(`${Math.round(genVolts)} kV`, 80, 50);
   busGauge.fillStyle = "white";
   busGauge.fillText(`${syncscopeActive ? busVolts : 0} kV`, 80, 50);
+
+  if (genVoltGauge) {
+    genVoltGauge.value = genVolts;
+  }
 }
 
 function drawSyncscope() {
   const sc = document.getElementById("syncscope").getContext("2d");
   sc.clearRect(0, 0, 200, 200);
+
   sc.strokeStyle = "white";
   sc.beginPath();
   sc.arc(100, 100, 90, 0, Math.PI * 2);
   sc.stroke();
 
+  let angle;
+
   if (syncscopeActive && masterOn) {
-    let delta = (genFreq - busFreq) * 6;
+    let delta = (genFreq - busFreq) * 6; // degrees per frame
     phase += delta;
-    const angle = ((phase % 360) * Math.PI) / 180;
-    const x = 100 + 80 * Math.cos(angle);
-    const y = 100 + 80 * Math.sin(angle);
-
-    sc.strokeStyle = "red";
-    sc.beginPath();
-    sc.moveTo(100, 100);
-    sc.lineTo(x, y);
-    sc.stroke();
-
-    drawSyncLights(angle);
+    angle = ((phase % 360) * Math.PI) / 180;
   } else {
-    drawSyncLights(null);
+    angle = -Math.PI / 2; // TDC
   }
+
+  const x = 100 + 80 * Math.cos(angle);
+  const y = 100 + 80 * Math.sin(angle);
+
+  sc.strokeStyle = "red";
+  sc.beginPath();
+  sc.moveTo(100, 100);
+  sc.lineTo(x, y);
+  sc.stroke();
+
+  drawSyncLights(angle);
 }
 
 function drawSyncLights(angle) {
@@ -147,7 +155,7 @@ function drawSyncLights(angle) {
 
   let brightness =
     Math.abs(Math.sin(angle)) +
-    Math.abs(genVolts - busVolts) / maxVolts;
+    Math.abs(genVolts - busVolts) / 130;
   brightness = Math.min(1, brightness);
 
   const glow = `0 0 ${30 * brightness}px rgba(255,255,100,${brightness})`;
@@ -159,26 +167,34 @@ function drawSyncLights(angle) {
 
 function drawSineWave() {
   ctx.clearRect(0, 0, sineCanvas.width, sineCanvas.height);
+
+  const cycles = 6; // fixed 6 cycles of 60Hz = 100ms = 0.1s window
+  const duration = cycles / 60; // ~0.1 seconds
+  const pxPerSec = sineCanvas.width / duration;
+
+  // Bus (fixed at 60 Hz)
   ctx.strokeStyle = "red";
   ctx.beginPath();
   for (let x = 0; x < sineCanvas.width; x++) {
-    let t = time + x / 100;
-    let y = 100 + 50 * Math.sin(2 * Math.PI * busFreq * t);
+    const t = x / pxPerSec + time;
+    const y = 100 + 50 * Math.sin(2 * Math.PI * 60 * t);
     ctx.lineTo(x, y);
   }
   ctx.stroke();
 
+  // Gen
   if (fieldClosed) {
     ctx.strokeStyle = "blue";
     ctx.beginPath();
     for (let x = 0; x < sineCanvas.width; x++) {
-      let t = time + x / 100;
-      let y = 100 + 50 * Math.sin(2 * Math.PI * genFreq * t);
+      const t = x / pxPerSec + time;
+      const y = 100 + 50 * Math.sin(2 * Math.PI * genFreq * t);
       ctx.lineTo(x, y);
     }
     ctx.stroke();
   }
-  time += 0.01;
+
+  time += 1 / 60 / sineCanvas.width;
 }
 
 function loop() {
