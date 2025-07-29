@@ -2,92 +2,67 @@ body {
   background: #111;
   color: #eee;
   font-family: monospace;
-  margin: 0;
-  padding: 1rem;
-  display: flex;
-  justify-content: center;
-}
-
-.hmi {
-  max-width: 900px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-}
-
-.meter-row {
-  display: flex;
-  gap: 4rem;
-  justify-content: center;
-  align-items: center;
-}
-
-.meter {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font-size: 0.9rem;
-}
-
-.meter-display {
-  background: #222;
-  border: 2px inset #666;
-  padding: 0.5rem 1rem;
-  margin-top: 0.3rem;
-  font-size: 1.4rem;
-  min-width: 100px;
   text-align: center;
 }
 
-.synchro-section {
-  margin-top: 0.5rem;
+.gauges {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin-bottom: 1rem;
 }
 
-.light-row {
-  display: flex;
-  gap: 3rem;
+.gauge-display {
+  font-size: 1.5rem;
+  background: #222;
+  padding: 0.5rem 1rem;
+  border: 2px solid #444;
+  display: inline-block;
   margin-top: 0.3rem;
 }
 
-.light {
+#synchroscope {
+  background: black;
+  border: 2px solid #ccc;
+  margin: 1rem auto;
+}
+
+.sync-lights {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin: 1rem;
+}
+
+.sync-light {
   width: 30px;
   height: 30px;
-  background: #222;
   border-radius: 50%;
-  border: 2px solid #888;
+  background: #222;
   box-shadow: 0 0 10px #000;
 }
 
-.freq-row {
-  display: flex;
-  gap: 2rem;
-  font-size: 1rem;
+.frequencies {
+  margin: 1rem;
 }
 
-.switches {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  justify-content: center;
-  margin-top: 1rem;
+.controls {
+  margin: 1rem;
 }
 
 button {
   background: #333;
-  color: #eee;
-  border: 1px solid #666;
+  color: white;
+  border: 1px solid #777;
   padding: 0.5rem 1rem;
-  cursor: pointer;
-  font-size: 0.9rem;
+  margin: 0.2rem;
+  font-family: monospace;
 }
 
-button:hover {
-  background: #555;
-}
-
-canvas {
-  background: #000;
-  margin-top: 1rem;
-  border: 1px solid #333;
+#waveform {
+  width: 800px;
+  height: 200px;
+  background: black;
+  display: block;
+  margin: 1rem auto;
 }
